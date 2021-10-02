@@ -28,7 +28,7 @@ class Client:
 
     def connect_server(self):
         '''
-        Handles the client/s connection to server.
+        Handles the client/s connection to server and receiving data sent from server.
         '''
         try:
             print(
@@ -41,28 +41,40 @@ class Client:
             print("Something went wrong, exiting.")
             sys.exit()
 
+        # client is able to set their username to help identify themself in the chat
         self.username = input("Please enter your username: ")
         print(f"Hi {self.username}, welcome to the chat room!\n")
-        print("You may now send messages to the room.")
-        print("To leave the the chat room, type 'LEAVE'")
         time.sleep(1)
 
+        # thread for sending data to server begins here
         data_thread = threading.Thread(target=self.send_data)
         data_thread.daemon = True
         data_thread.start()
 
+        # announces the client who joined to all connected clients
         self.client_socket.sendall(
-            f'[SERVER] {self.username} has joined the room.'.encode('utf-8'))
+            f'[SERVER] {self.username} has joined the room.\n'.encode('utf-8'))
 
+        time.sleep(1)
+        print("You may now send messages to the room.")
+        print("To leave the the chat room, type 'LEAVE'\n")
+
+        # this is where data is received via the server
         while True:
             data = self.client_socket.recv(1024).decode('utf-8')
             if not data:
-                break
+                # if server is closed, exits the client program
+                print("Lost connection to the server.")
+                print("The program will now shutdown.")
+                self.client_socket.close()
+                sys.exit()
             print(data)
 
     def send_data(self):
+        '''
+        Handles sending data to server and allows client to leave chat room.
+        '''
         while True:
-            print(f"{self.username}", end='')
             sys.stdout.flush()
             message = sys.stdin.readline()[:-1]
 

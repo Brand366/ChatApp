@@ -23,12 +23,13 @@ class Server:
         self.ip = ip
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # this is used to allow the same ip address to be used for server connection
         self.server_socket.setsockopt(
             socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     def establish_server(self):
         '''
-        Establishes listening server socket for client connections
+        Creates and binds server socket and establishes listening socket for client connections.
         '''
         try:
             self.server_socket.bind((self.ip, self.port))
@@ -39,6 +40,8 @@ class Server:
         time.sleep(1)
         self.server_socket.listen(5)
         print(f"[SERVER] Established server on port {self.port}.")
+        print("To close the server and connected clients...")
+        print("Simply input 'ctrl+c' in the command terminal.")
 
     def run_server(self):
         '''
@@ -62,21 +65,31 @@ class Server:
         '''
         Handles data flow from the connected client/s and broadcasts the message to 
         all connected clients.
+
+        Args:
+            connection (socket.socket): Connected client's socket.
         '''
         while True:
             data = connection.recv(1024).decode('utf-8')
             for connection in self.client_connections:
                 connection.sendall(data.encode('utf-8'))
             if not data:
+                # if client disconnects, remove client from list and close relevant socket
                 print(f"{self.ip} from port: {self.port} has disconnected")
                 self.client_connections.remove(connection)
                 connection.close()
                 break
 
     def stop_server(self):
-        for connection in self.client_connections:
-            self.client_connections.remove(connection)
-            connection.close()
+        '''
+        Handles closing all connected clients and ending the server conncetion.
+        '''
+        while len(self.client_connections) > 0:
+            for connection in self.client_connections:
+                self.client_connections.remove(connection)
+                connection.close()
+
+        self.server_socket.close()
 
 
 def main():
@@ -108,7 +121,6 @@ def main():
     except KeyboardInterrupt:
         print("[SERVER] Closing server.")
         server.stop_server()
-        server.server_socket.close()
 
 
 if __name__ == "__main__":

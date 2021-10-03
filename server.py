@@ -5,6 +5,7 @@ import argparse
 import socket
 import threading
 import time
+import sys
 
 
 class Server:
@@ -38,10 +39,10 @@ class Server:
 
         print("[SERVER] Establishing server...")
         time.sleep(1)
-        self.server_socket.listen(5)
+        self.server_socket.listen(10)
         print(f"[SERVER] Established server on port {self.port}.")
-        print("To close the server and connected clients...")
-        print("Simply input 'ctrl+c' in the command terminal.")
+        print("[SERVER] To close the server and connected clients...")
+        print("[SERVER] Simply input 'ctrl+c' in the command terminal.")
 
     def run_server(self):
         '''
@@ -49,36 +50,61 @@ class Server:
         '''
         while True:
             try:
-                connection, address = self.server_socket.accept()
-                print(f"Accepted connection from {address}")
+                c_connection, address = self.server_socket.accept()
+                print(f"[SERVER] Accepted connection from {address}")
                 # begin thread for sending data
                 connection_thread = threading.Thread(
-                    target=self.data_handler, args=(connection, address))
+                    target=self.data_handler, args=(c_connection, address))
                 connection_thread.daemon = True
                 connection_thread.start()
                 # add connected client to list of clients
-                self.client_connections.append(connection)
+                self.client_connections.append(c_connection)
             except Exception as e:
                 print(str(e))
 
-    def data_handler(self, connection, address):
+    def data_handler(self, c_connection, address):
         '''
-        Handles data flow from the connected client/s and broadcasts the message to 
+        Handles data flow from the connected client/s and broadcasts the message to
         all connected clients.
 
         Args:
             connection (socket.socket): Connected client's socket.
+            address (tuple): The socket address of the connected client.
         '''
         while True:
-            data = connection.recv(1024).decode('utf-8')
-            for connection in self.client_connections:
-                connection.sendall(data.encode('utf-8'))
+            data = c_connection.recv(2048).decode('utf-8')
+            if data:
+                print(f'{address} says {data}')
+                self.broadcast_data(data, address)
             if not data:
                 # if client disconnects, remove client from list and close relevant socket
-                print(f"{self.ip} from port: {self.port} has disconnected")
-                self.client_connections.remove(connection)
-                connection.close()
-                break
+                print(
+                    f"[SERVER] {self.ip} from port: {self.port} has disconnected")
+                self.client_connections.remove(c_connection)
+                c_connection.close()
+                return
+
+    def send_data(self, c_connection,  data):
+        '''
+        Handles sending data to connected clients.
+
+        Args:
+            connection (socket.socket): Connected client's socket.
+            data (str): The message that is to be sent.
+        '''
+        c_connection.sendall(data.encode('utf-8'))
+
+    def broadcast_data(self, data, source):
+        '''
+        Handles broadcasting data to connected clients except for the source sender.
+
+        Args:
+            data (str): The message that is to be sent.
+            source (tuple): The socket address of the source client.
+        '''
+        for connection in self.client_connections:
+            if connection != source:
+                self.send_data(connection, data)
 
     def stop_server(self):
         '''
@@ -88,7 +114,7 @@ class Server:
             for connection in self.client_connections:
                 self.client_connections.remove(connection)
                 connection.close()
-
+        print("[SERVER] Closing the server and disconnecting clients...")
         self.server_socket.close()
 
 
@@ -108,10 +134,12 @@ def main():
     except Exception:
         print("[SERVER] Which port would you like to communicate on? ")
         port = int(input(options.port))
+    except KeyboardInterrupt:
+        sys.exit()
 
     server_ip_name = socket.gethostname()
     server_ip = socket.gethostbyname(server_ip_name)
-    print(f"The server's address to connect to is {server_ip}")
+    print(f"[SERVER] The server's address to connect to is {server_ip}")
 
     server = Server(server_ip, port)
 
@@ -119,7 +147,6 @@ def main():
         server.establish_server()
         server.run_server()
     except KeyboardInterrupt:
-        print("[SERVER] Closing server.")
         server.stop_server()
 
 
